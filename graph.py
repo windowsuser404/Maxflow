@@ -2,7 +2,7 @@ import networkx as nx
 import random
 
 # Create a random graph
-graph = nx.gnp_random_graph(1000, 0.7)
+graph = nx.gnp_random_graph(2000, 0.4)
 # Assign random weights to edges
 for edge in graph.edges():
     graph[edge[0]][edge[1]]['capacity'] = random.randint(1, 100)

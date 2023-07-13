@@ -14,12 +14,13 @@ typedef struct Edge {
     int v;              // The other endpoint of the edge
     int capacity;       // Capacity of the edge
     int flow;           // Current flow through the edge
-    struct Edge* next;  // Pointer to the next edge
+    //struct Edge* next;  // Pointer to the next edge
 } Edge;
 
 // Structure to represent a node in the graph
 typedef struct Node {
-    Edge* head;     // Pointer to the head of the adjacency list
+    Edge** edges;     // array of all edges from this node
+    int size; //number of its neightbours
     int excessFlow; // Excess flow at the node
     int height;     // Height of the node
 } Node;
@@ -27,7 +28,8 @@ typedef struct Node {
 // Function to create a new node
 Node* createNode() {
     Node* newNode = (Node*)malloc(sizeof(Node));
-    newNode->head = NULL;
+    newNode->edges = NULL;
+    newNode->size = 0;
     newNode->excessFlow = 0;
     newNode->height = 0;
     return newNode;
@@ -39,21 +41,32 @@ Edge* createEdge(int v, int capacity) {
     newEdge->v = v;
     newEdge->capacity = capacity;
     newEdge->flow = 0;
-    newEdge->next = NULL;
     return newEdge;
 }
 
 // Function to add an edge to the graph
 void addEdge(Node* nodes[], int u, int v, int capacity) {
     // Create a new edge from u to v
-    Edge* newEdge = createEdge(v, capacity);
-    newEdge->next = nodes[u]->head;
-    nodes[u]->head = newEdge;
+   // Edge* newEdge = createEdge(v, capacity);
+   // newEdge->next = nodes[u]->head;
+   // nodes[u]->head = newEdge;
+   if(nodes[u]->edges==NULL){
+	   nodes[u]->edges = (Edge**)malloc(sizeof(Edge*));
+   }
+   nodes[u]->edges = realloc(nodes[u]->edges, (nodes[u]->size+1)*sizeof(Edge));
+   nodes[u]->edges[nodes[u]->size] = createEdge(v, capacity);
+   nodes[u]->size++;
+   if(nodes[v]->edges==NULL){
+	   nodes[v]->edges = (Edge**)malloc(sizeof(Edge*));
+   }
+   nodes[v]->edges = realloc(nodes[v]->edges, (nodes[v]->size+1)*sizeof(Edge));
+   nodes[v]->edges[nodes[v]->size] = createEdge(u, capacity);
+   nodes[v]->size++;
 
     // Create a new edge from v to u (for undirected graph)
-    newEdge = createEdge(u, capacity);
-    newEdge->next = nodes[v]->head;
-    nodes[v]->head = newEdge;
+ //   newEdge = createEdge(u, capacity);
+ //   newEdge->next = nodes[v]->head;
+ //   nodes[v]->head = newEdge;
 }
 
 // Function to perform breadth-first search (BFS) to find an augmenting path
@@ -76,14 +89,15 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 //can try tasks and put nowait cos u dont need to wait
     while (front < rear) {
         int u = queue[front++];
+	Node* node = nodes[u];
 	bool found=false;
-        Edge* edge = nodes[u]->head;
-        while (edge != NULL) {
-            int v = edge->v;
+//        Edge* edge = nodes[u]->head;
+        for(int i=0;i<node->size;i++) {
+            int v = node->edges[i]->v;
 #ifdef DEBUG
 	    printf("%d to %d has capacity:%d and flow:%d\n",u,v,edge->capacity,edge->flow);
 #endif
-	    if (!visited[v] && edge->capacity > 0) {
+	    if (!visited[v] && node->edges[i]->capacity > 0) {
                 visited[v] = true;
                 parent[v] = u;
                 queue[rear++] = v;
@@ -97,13 +111,13 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 			}
 #endif
                     found=true;
-                }
+		}
             }
-	    if(found){
-		    return true;
-	    }
-            edge = edge->next;
-        }
+	}
+	if(found){
+		return true;
+	}
+
     }
 
     return false;
@@ -119,16 +133,15 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
 
     // Initialize the flow to 0
     for (int u = 0; u < numNodes; u++) {
-        Edge* edge = nodes[u]->head;
-        while (edge != NULL) {
-            edge->flow = 0;
-            edge = edge->next;
-        }
+	Node* node = nodes[u];
+	for(int i=0;i<node->size;i++){
+		node->edges[i]->flow = 0;
+	}
     }
 
     // Preprocess: Push as much flow as possible from the source
-    Edge* edge = nodes[source]->head;
- /*   while (edge != NULL) {
+ /*   Edge* edge = nodes[source]->head;
+    while (edge != NULL) {
         int v = edge->v;
         int capacity = edge->capacity;
 
@@ -152,19 +165,19 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
         int bottleneckCapacity = INT_MAX;
         for (int v = sink; v != source; v = parent[v]) {
             int u = parent[v];
-            Edge* edge = nodes[u]->head;
-            while (edge != NULL) {
-                if (edge->v == v) {
+	Node* node = nodes[u];
+	    for(int i=0;i<node->size;i++){
+		    if(node->edges[i]->v==v){
 #ifdef DEBUG
 		    printf("bottle neck was %d and residual between %d and %d is %d\n",bottleneckCapacity,u,v,residualCapacity);
 #endif
-                    if (edge->capacity < bottleneckCapacity) {
-                        bottleneckCapacity = edge->capacity;
-                    }
-                    break;
-                }
-                edge = edge->next;
-            }
+			    if(node->edges[i]->capacity < bottleneckCapacity){
+				    bottleneckCapacity = node->edges[i]->capacity;
+			    }
+			    break;
+		    }
+	    }
+
         }
 #ifdef DEBUG
 	printf("Bottle neck capa found:%d\n",bottleneckCapacity);
@@ -172,31 +185,18 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
         // Update the flow and capacities along the augmenting path
         for (int v = sink; v != source; v = parent[v]) {
             int u = parent[v];
-            Edge* edge = nodes[u]->head;
-            while (edge != NULL) {
-                if (edge->v == v) {
-                    edge->flow += bottleneckCapacity;
-                    edge->capacity -= bottleneckCapacity;
-
-                    // Update the reverse edge (for undirected graph)
-                   /* Edge* reverseEdge = nodes[v]->head;
-                    while (reverseEdge != NULL) {
-                        if (reverseEdge->v == u) {
-                            reverseEdge->flow -= bottleneckCapacity;
-                            reverseEdge->capacity += bottleneckCapacity;
-                            break;
-                        }
-                        reverseEdge = reverseEdge->next;
-                    }
-                    break;*/
+            Node* node = nodes[u];
+            for(int i=0;i<node->size;i++) {
+                if (node->edges[i]->v == v) {
+                   node-> edges[i]->flow += bottleneckCapacity;
+                    node->edges[i]->capacity -= bottleneckCapacity;
                 }
-                edge = edge->next;
             }
         }
     }
     // Calculate and return the maximum flow at the sink node
     int maxFlow = 0;
-     edge = nodes[source]->head;
+    Node *node = nodes[source];
 #ifdef DEBUG
      Edge* temporary_edge;
 for(int lmao=0;lmao<numNodes;lmao++){
@@ -207,9 +207,8 @@ for(int lmao=0;lmao<numNodes;lmao++){
 	}
 }
 #endif
-    while (edge != NULL) {
-        maxFlow += edge->flow;
-        edge = edge->next;
+    for(int i=0;i<node->size;i++) {
+        maxFlow += node->edges[i]->flow;
     }
 
     return maxFlow;
@@ -240,7 +239,7 @@ t1=omp_get_wtime();
     int maxFlow = maxFlowEdmondsKarp(nodes, source, sink, numNodes);
 t2=omp_get_wtime();
     printf("Maximum Flow: %d\n", maxFlow);
-	printf("Time in serial:%f\n",t2-t1);
+    printf("Time in Serial is:%f\n",t2-t1);
     return 0;
 }
 

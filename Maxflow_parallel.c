@@ -75,6 +75,7 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 	printf("\n Visited %d times\n",++check_counter);
 #endif
     bool visited[numNodes];
+#pragma omp parallel for
     for (int i = 0; i < numNodes; i++) {
         visited[i] = false;
     }
@@ -92,6 +93,7 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 	Node* node = nodes[u];
 	bool found=false;
 //        Edge* edge = nodes[u]->head;
+#pragma omp parallel for
         for(int i=0;i<node->size;i++) {
             int v = node->edges[i]->v;
 #ifdef DEBUG
@@ -100,7 +102,10 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 	    if (!visited[v] && node->edges[i]->capacity > 0) {
                 visited[v] = true;
                 parent[v] = u;
+#pragma omp critical
+		{
                 queue[rear++] = v;
+		}
 
                 if (v == sink) {
 #ifdef DEBUG
@@ -126,12 +131,14 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 // Function to find the maximum flow in an undirected graph using Edmonds-Karp algorithm
 int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
     // Initialize the excess flow and height of all nodes
+#pragma omp parallel for
     for (int i = 0; i < numNodes; i++) {
         nodes[i]->excessFlow = 0;
         nodes[i]->height = 0;
     }
 
     // Initialize the flow to 0
+#pragma omp parallel for
     for (int u = 0; u < numNodes; u++) {
 	Node* node = nodes[u];
 	for(int i=0;i<node->size;i++){
@@ -207,6 +214,7 @@ for(int lmao=0;lmao<numNodes;lmao++){
 	}
 }
 #endif
+#pragma omp parallel  for reduction(+: maxFlow)
     for(int i=0;i<node->size;i++) {
         maxFlow += node->edges[i]->flow;
     }
@@ -215,7 +223,6 @@ for(int lmao=0;lmao<numNodes;lmao++){
 }
 
 int main(int argc, char* argv[]) {
-	omp_set_num_threads(8);
 	FILE* file = fopen(argv[1],"r");
      numNodes = atoi(argv[2])+1;
    int source = atoi(argv[3]);
@@ -240,7 +247,7 @@ t1=omp_get_wtime();
     int maxFlow = maxFlowEdmondsKarp(nodes, source, sink, numNodes);
 t2=omp_get_wtime();
     printf("Maximum Flow: %d\n", maxFlow);
-    printf("Time in parallel is:%f\n",t2-t1);
+    printf("Time in Serial is:%f\n",t2-t1);
     return 0;
 }
 
