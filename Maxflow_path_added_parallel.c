@@ -14,7 +14,6 @@ typedef struct Edge {
     int v;              // The other endpoint of the edge
     int capacity;       // Capacity of the edge
     int flow;           // Current flow through the edge
-    //struct Edge* next;  // Pointer to the next edge
 } Edge;
 
 // Structure to represent a node in the graph
@@ -46,10 +45,6 @@ Edge* createEdge(int v, int capacity) {
 
 // Function to add an edge to the graph
 void addEdge(Node* nodes[], int u, int v, int capacity) {
-    // Create a new edge from u to v
-   // Edge* newEdge = createEdge(v, capacity);
-   // newEdge->next = nodes[u]->head;
-   // nodes[u]->head = newEdge;
    if(nodes[u]->edges==NULL){
 	   nodes[u]->edges = (Edge**)malloc(sizeof(Edge*));
    }
@@ -63,10 +58,6 @@ void addEdge(Node* nodes[], int u, int v, int capacity) {
    nodes[v]->edges[nodes[v]->size] = createEdge(u, capacity);
    nodes[v]->size++;
 
-    // Create a new edge from v to u (for undirected graph)
- //   newEdge = createEdge(u, capacity);
- //   newEdge->next = nodes[v]->head;
- //   nodes[v]->head = newEdge;
 }
 
 // Function to perform breadth-first search (BFS) to find an augmenting path
@@ -74,8 +65,7 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 #ifdef DEBUG
 	printf("\n Visited %d times\n",++check_counter);
 #endif
- //   bool visited[numNodes];
-      bool* visited = (bool*)malloc(numNodes*sizeof(bool));
+    bool visited[numNodes];
 #pragma omp parallel for
     for (int i = 0; i < numNodes; i++) {
         visited[i] = false;
@@ -85,8 +75,7 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
     parent[source] = -1;
 
     // Create a queue for BFS
-   // int queue[numNodes];
-   int *queue = (int*)malloc(numNodes*sizeof(int));
+    int queue[numNodes];
     int front = 0, rear = 0;
     queue[rear++] = source;
 //can try tasks and put nowait cos u dont need to wait
@@ -94,9 +83,8 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
         int u = queue[front++];
 	Node* node = nodes[u];
 	bool found=false;
-	int local_rear;
 //        Edge* edge = nodes[u]->head;
-#pragma omp parallel for private(local_rear)
+#pragma omp parallel for
         for(int i=0;i<node->size;i++) {
             int v = node->edges[i]->v;
 #ifdef DEBUG
@@ -105,9 +93,10 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 	    if (!visited[v] && node->edges[i]->capacity > 0) {
                 visited[v] = true;
                 parent[v] = u;
-#pragma omp atomic capture
-	        local_rear = rear++;
-                queue[local_rear] = v;
+#pragma omp critical
+		{
+                queue[rear++] = v;
+		}
 
                 if (v == sink) {
 #ifdef DEBUG
@@ -147,39 +136,29 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
 		node->edges[i]->flow = 0;
 	}
     }
-
-    // Preprocess: Push as much flow as possible from the source
- /*   Edge* edge = nodes[source]->head;
-    while (edge != NULL) {
-        int v = edge->v;
-        int capacity = edge->capacity;
-
-        edge->flow = capacity;
-        edge->capacity = 0;
-
-        nodes[source]->excessFlow -= capacity;
-        nodes[v]->excessFlow += capacity;
-
-        edge = edge->next;
-    }*/
-
     // Find the maximum flow using Edmonds-Karp algorithm
     while (true) {
-        //int parent[numNodes];
-	int* parent = (int*)malloc(numNodes*sizeof(int));
+        int parent[numNodes];
         if (!bfs(nodes, source, sink, parent, numNodes)) {
             break;
         }
-	
+	//to calculate the total path to provide random access
+	int path_size=1;
+	int path[numNodes];
+	path[0] = sink;
+	for (int v = sink; v != source; v = parent[v]){
+		path[path_size++] = parent[v];
+	}	
         // Find the bottleneck capacity (minimum residual capacity) along the augmenting path
         int bottleneckCapacity = INT_MAX;
-        for (int v = sink; v != source; v = parent[v]) {
-            int u = parent[v];
+#pragma parallel omp for reduction(min: bottleneckCapacity)
+        for (int v = 0; v<path_size; v++) {
+            int u = parent[path[v]];
 	Node* node = nodes[u];
 	    for(int i=0;i<node->size;i++){
-		    if(node->edges[i]->v==v){
+		    if(node->edges[i]->v==path[v]){
 #ifdef DEBUG
-		    printf("bottle neck was %d and residual between %d and %d is %d\n",bottleneckCapacity,u,v,residualCapacity);
+		    printf("bottle neck was %d and residual between %d and %d is %d\n",bottleneckCapacity,u,path[v],residualCapacity);
 #endif
 			    if(node->edges[i]->capacity < bottleneckCapacity){
 				    bottleneckCapacity = node->edges[i]->capacity;
@@ -193,11 +172,12 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
 	printf("Bottle neck capa found:%d\n",bottleneckCapacity);
 #endif
         // Update the flow and capacities along the augmenting path
-        for (int v = sink; v != source; v = parent[v]) {
-            int u = parent[v];
+#pragma parallel omp for
+        for (int v = 0; v <path_size; v++) {
+            int u = parent[path[v]];
             Node* node = nodes[u];
             for(int i=0;i<node->size;i++) {
-                if (node->edges[i]->v == v) {
+                if (node->edges[i]->v == path[v]) {
                    node-> edges[i]->flow += bottleneckCapacity;
                     node->edges[i]->capacity -= bottleneckCapacity;
                 }
@@ -226,7 +206,6 @@ for(int lmao=0;lmao<numNodes;lmao++){
 }
 
 int main(int argc, char* argv[]) {
-	omp_set_num_threads(4);
 	FILE* file = fopen(argv[1],"r");
      numNodes = atoi(argv[2])+1;
    int source = atoi(argv[3]);
@@ -236,8 +215,7 @@ int main(int argc, char* argv[]) {
 	    exit(0);
     }
 
-   // Node* nodes[numNodes];
-    Node** nodes = (Node**)malloc(numNodes*sizeof(Node*));
+    Node* nodes[numNodes];
     for (int i = 0; i < numNodes; i++) {
         nodes[i] = createNode();
     }
