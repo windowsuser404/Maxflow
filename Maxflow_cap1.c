@@ -74,7 +74,8 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 #ifdef DEBUG
 	printf("\n Visited %d times\n",++check_counter);
 #endif
-    bool visited[numNodes];
+    //bool visited[numNodes];
+    bool* visited = (bool*)malloc(numNodes*sizeof(bool));
     for (int i = 0; i < numNodes; i++) {
         visited[i] = false;
     }
@@ -83,7 +84,8 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
     parent[source] = -1;
 
     // Create a queue for BFS
-    int queue[numNodes];
+    //int queue[numNodes];
+    int* queue = (int*)malloc(numNodes*sizeof(int));
     int front = 0, rear = 0;
     queue[rear++] = source;
 //can try tasks and put nowait cos u dont need to wait
@@ -156,7 +158,8 @@ int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
 
     // Find the maximum flow using Edmonds-Karp algorithm
     while (true) {
-        int parent[numNodes];
+        //int parent[numNodes];
+	int* parent = (int*)malloc(numNodes*sizeof(int));
         if (!bfs(nodes, source, sink, parent, numNodes)) {
             break;
         }
@@ -224,7 +227,8 @@ int main(int argc, char* argv[]) {
 	    exit(0);
     }
 
-    Node* nodes[numNodes];
+    //Node* nodes[numNodes];
+    Node** nodes = (Node**)malloc(numNodes*sizeof(Node*));
     for (int i = 0; i < numNodes; i++) {
         nodes[i] = createNode();
     }
