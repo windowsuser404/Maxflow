@@ -21,8 +21,6 @@ typedef struct Edge {
 typedef struct Node {
     Edge** edges;     // array of all edges from this node
     int size; //number of its neightbours
-    int excessFlow; // Excess flow at the node
-    int height;     // Height of the node
 } Node;
 
 // Function to create a new node
@@ -30,8 +28,6 @@ Node* createNode() {
     Node* newNode = (Node*)malloc(sizeof(Node));
     newNode->edges = NULL;
     newNode->size = 0;
-    newNode->excessFlow = 0;
-    newNode->height = 0;
     return newNode;
 }
 
@@ -133,12 +129,6 @@ bool bfs(Node* nodes[], int source, int sink, int parent[], int numNodes) {
 // Function to find the maximum flow in an undirected graph using Edmonds-Karp algorithm
 int maxFlowEdmondsKarp(Node* nodes[], int source, int sink, int numNodes) {
     // Initialize the excess flow and height of all nodes
-#pragma omp parallel for
-    for (int i = 0; i < numNodes; i++) {
-        nodes[i]->excessFlow = 0;
-        nodes[i]->height = 0;
-    }
-
     // Initialize the flow to 0
 #pragma omp parallel for
     for (int u = 0; u < numNodes; u++) {
