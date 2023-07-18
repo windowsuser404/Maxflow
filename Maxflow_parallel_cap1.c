@@ -53,13 +53,13 @@ void addEdge(Node* nodes[], int u, int v, int capacity) {
    if(nodes[u]->edges==NULL){
 	   nodes[u]->edges = (Edge**)malloc(sizeof(Edge*));
    }
-   nodes[u]->edges = realloc(nodes[u]->edges, (nodes[u]->size+1)*sizeof(Edge));
+   nodes[u]->edges = realloc(nodes[u]->edges, (nodes[u]->size+1)*sizeof(Edge*));
    nodes[u]->edges[nodes[u]->size] = createEdge(v, capacity);
    nodes[u]->size++;
    if(nodes[v]->edges==NULL){
 	   nodes[v]->edges = (Edge**)malloc(sizeof(Edge*));
    }
-   nodes[v]->edges = realloc(nodes[v]->edges, (nodes[v]->size+1)*sizeof(Edge));
+   nodes[v]->edges = realloc(nodes[v]->edges, (nodes[v]->size+1)*sizeof(Edge*));
    nodes[v]->edges[nodes[v]->size] = createEdge(u, capacity);
    nodes[v]->size++;
 
